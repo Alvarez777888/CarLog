@@ -1,0 +1,2 @@
+#pragma once
+#define CARLOG_API_URL "@CARLOG_API_URL@"

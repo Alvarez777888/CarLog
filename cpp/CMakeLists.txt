@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.21)
+project(CarLogServer LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+find_package(PostgreSQL REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(CURL 7.85 CONFIG QUIET)
+if(NOT TARGET CURL::libcurl)
+    find_package(CURL 7.85 REQUIRED)
+endif()
+find_package(Threads REQUIRED)
+
+add_executable(carlog-server main.cpp core.cpp auth.cpp cars.cpp records.cpp
+    stats.cpp telegram.cpp recovery.cpp)
+target_include_directories(carlog-server PRIVATE ../vendor)
+target_link_libraries(carlog-server PRIVATE PostgreSQL::PostgreSQL OpenSSL::Crypto
+    CURL::libcurl Threads::Threads)
+if(WIN32)
+    target_compile_definitions(carlog-server PRIVATE _WIN32_WINNT=0x0A00)
+    target_link_libraries(carlog-server PRIVATE ws2_32)
+endif()
+if(MSVC)
+    target_compile_options(carlog-server PRIVATE /utf-8)
+endif()
+configure_file(schema.sql schema.sql COPYONLY)

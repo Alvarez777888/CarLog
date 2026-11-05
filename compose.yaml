@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: carlog
+      POSTGRES_USER: carlog
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      TZ: ${CARLOG_TIMEZONE:-Asia/Novosibirsk}
+      PGTZ: ${CARLOG_TIMEZONE:-Asia/Novosibirsk}
+    volumes:
+      - carlog_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "carlog", "-d", "carlog"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+  server:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      CARLOG_DATABASE_URL: "host=db dbname=carlog user=carlog connect_timeout=3"
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGTZ: ${CARLOG_TIMEZONE:-Asia/Novosibirsk}
+      CARLOG_HOST: "0.0.0.0"
+      CARLOG_BOT_TOKEN: ""
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+  bot:
+    profiles: ["telegram"]
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      CARLOG_BOT_SECRET: ${CARLOG_BOT_SECRET:?Set CARLOG_BOT_SECRET in .env}
+      CARLOG_BOT_TOKEN: ${CARLOG_BOT_TOKEN:-}
+      CARLOG_SERVER_URL: http://server:8000
+      HTTPS_PROXY: "http://host.docker.internal:10809"
+      NO_PROXY: "server,localhost,127.0.0.1"
+      CARLOG_OCR_LANG: ${CARLOG_OCR_LANG:-rus+eng}
+      TZ: ${CARLOG_TIMEZONE:-Asia/Novosibirsk}
+    restart: unless-stopped
+volumes:
+  carlog_db:
